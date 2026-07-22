@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: qms-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-qms_db}
+      POSTGRES_USER: ${POSTGRES_USER:-qms_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-qms_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-qms_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - qms_network
+
+  api:
+    build: .
+    container_name: qms-api
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-qms_user}:${POSTGRES_PASSWORD:-qms_password}@postgres:5432/${POSTGRES_DB:-qms_db}
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      DEBUG: ${DEBUG:-False}
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000", "http://localhost:5173"]}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    networks:
+      - qms_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  qms_network:
+    driver: bridge
